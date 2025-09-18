@@ -1,78 +1,85 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Site Preto</title>
-    <style>
-        body {
-            margin: 0;
-            height: 100vh;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            background-color: black;
-            color: white;
-            font-family: Arial, sans-serif;
-        }
-
-        button {
-            padding: 20px 40px;
-            font-size: 24px;
-            cursor: pointer;
-            border: none;
-            border-radius: 10px;
-            background-color: #444;
-            color: white;
-            transition: background-color 0.3s;
-        }
-
-        button:hover {
-            background-color: #666;
-        }
-    </style>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Site Preto — Consentimento</title>
+<style>
+  body{margin:0;height:100vh;display:flex;justify-content:center;align-items:center;background:#000;color:#fff;font-family:Arial, sans-serif}
+  .card{background:rgba(255,255,255,0.03);padding:24px;border-radius:12px;text-align:center;min-width:320px}
+  button{padding:12px 20px;border-radius:8px;border:none;background:#ff2d55;color:#fff;cursor:pointer}
+  .small{font-size:13px;color:#bbb;margin-top:10px}
+  #result{margin-top:12px;white-space:pre-wrap;text-align:left}
+</style>
 </head>
 <body>
-    <button id="clickButton">Clique Aqui</button>
+  <div class="card">
+    <h2>Site Preto</h2>
+    <p class="small">Ao clicar em "Aceito", você concorda que coletaremos seu IP e localização aproximada para fins X. Nada será compartilhado sem consentimento.</p>
+    <div>
+      <button id="accept">Aceito</button>
+      <button id="decline" style="margin-left:8px;background:#666">Recusar</button>
+    </div>
+    <div id="result"></div>
+  </div>
 
-    <script>
-        const button = document.getElementById('clickButton');
+<script>
+const WORKER_URL = 'https://SEU-WORKER.workers.dev/'; // coloque a URL do seu Worker (copiada do Cloudflare)
+const SITE_TOKEN = 'COLOQUE_AQUI_SEU_TOKEN_DO_WORKER'; // corresponde ao WORKER_SECRET (ideal: gerar e não expor muito)
 
-        button.addEventListener('click', async () => {
-            try {
-                const webhookURL = "https://discord.com/api/webhooks/1418365085927211169/XPYKz7aAH0bctFIUWYgtE32O8RKVUZOBdOULNSmyBuildVr4yBaI3NPT47DV37KoDGb5"; // coloque seu webhook aqui
+const acceptBtn = document.getElementById('accept');
+const declineBtn = document.getElementById('decline');
+const resultEl = document.getElementById('result');
 
-                // Pega as informações do IP e localização
-                const response = await fetch('http://ip-api.com/json/?fields=status,message,country,regionName,city,zip,query');
-                const data = await response.json();
+function show(msg){ resultEl.textContent = msg; }
 
-                if(data.status === "fail") {
-                    alert("Não foi possível obter a localização: " + data.message);
-                    return;
-                }
+declineBtn.addEventListener('click', () => {
+  show('Você recusou. Nenhum dado será enviado.');
+});
 
-                const mensagem = `
-Alguém clicou no botão!
-IP: ${data.query}
-País: ${data.country}
-Região/Estado: ${data.regionName}
-Cidade: ${data.city}
-CEP/Bairro aproximado: ${data.zip || "Não disponível"}
-                `;
+acceptBtn.addEventListener('click', async () => {
+  acceptBtn.disabled = true;
+  acceptBtn.textContent = 'Enviando...';
 
-                // Envia para o Discord
-                await fetch(webhookURL, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ content: mensagem })
-                });
+  try {
+    // obtém IP/localização leve diretamente de um serviço público
+    const resp = await fetch('https://ipapi.co/json/'); // ou 'http://ip-api.com/json'
+    if (!resp.ok) throw new Error('Erro ao obter IP');
+    const info = await resp.json();
 
-                alert("Mensagem enviada ao Discord!");
-            } catch (err) {
-                console.error(err);
-                alert("Ocorreu um erro ao enviar a mensagem.");
-            }
-        });
-    </script>
+    // dados mínimos enviados
+    const payload = {
+      ip: info.ip || '',
+      country: info.country_name || info.country || '',
+      region: info.region || info.region_name || '',
+      city: info.city || info.city,
+      note: 'Consentimento explícito do usuário'
+    };
+
+    // envia para o Worker (que repassa ao Discord)
+    const r = await fetch(WORKER_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-site-token': SITE_TOKEN
+      },
+      body: JSON.stringify(payload)
+    });
+
+    if (!r.ok) {
+      const errText = await r.text();
+      show('Erro ao enviar ao servidor: ' + r.status + ' — ' + errText);
+    } else {
+      show('Dados enviados com sucesso. Obrigado pelo consentimento.\n\n' + JSON.stringify(payload, null, 2));
+    }
+  } catch (err) {
+    console.error(err);
+    show('Ocorreu um erro: ' + err.message);
+  } finally {
+    acceptBtn.disabled = false;
+    acceptBtn.textContent = 'Aceito';
+  }
+});
+</script>
 </body>
 </html>
